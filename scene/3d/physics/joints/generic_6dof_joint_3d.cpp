@@ -94,16 +94,19 @@ void Generic6DOFJoint3D::_bind_methods() {
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_x/stiffness"), "set_param_x", "get_param_x", PARAM_LINEAR_SPRING_STIFFNESS);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_x/damping"), "set_param_x", "get_param_x", PARAM_LINEAR_SPRING_DAMPING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_x/equilibrium_point", PROPERTY_HINT_NONE, "suffix:m"), "set_param_x", "get_param_x", PARAM_LINEAR_SPRING_EQUILIBRIUM_POINT);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_drive_x/force_limit", PROPERTY_HINT_NONE, U"suffix:kg⋅m/s² (N)"), "set_param_x", "get_param_x", PARAM_LINEAR_DRIVE_FORCE_LIMIT);
 
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "linear_spring_y/enabled"), "set_flag_y", "get_flag_y", FLAG_ENABLE_LINEAR_SPRING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_y/stiffness"), "set_param_y", "get_param_y", PARAM_LINEAR_SPRING_STIFFNESS);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_y/damping"), "set_param_y", "get_param_y", PARAM_LINEAR_SPRING_DAMPING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_y/equilibrium_point", PROPERTY_HINT_NONE, "suffix:m"), "set_param_y", "get_param_y", PARAM_LINEAR_SPRING_EQUILIBRIUM_POINT);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_drive_y/force_limit", PROPERTY_HINT_NONE, U"suffix:kg⋅m/s² (N)"), "set_param_y", "get_param_y", PARAM_LINEAR_DRIVE_FORCE_LIMIT);
 
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "linear_spring_z/enabled"), "set_flag_z", "get_flag_z", FLAG_ENABLE_LINEAR_SPRING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_z/stiffness"), "set_param_z", "get_param_z", PARAM_LINEAR_SPRING_STIFFNESS);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_z/damping"), "set_param_z", "get_param_z", PARAM_LINEAR_SPRING_DAMPING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_spring_z/equilibrium_point", PROPERTY_HINT_NONE, "suffix:m"), "set_param_z", "get_param_z", PARAM_LINEAR_SPRING_EQUILIBRIUM_POINT);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_drive_z/force_limit", PROPERTY_HINT_NONE, U"suffix:kg⋅m/s² (N)"), "set_param_z", "get_param_z", PARAM_LINEAR_DRIVE_FORCE_LIMIT);
 
 	ADD_GROUP("Angular Limit", "angular_limit_");
 
@@ -154,16 +157,19 @@ void Generic6DOFJoint3D::_bind_methods() {
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_x/stiffness"), "set_param_x", "get_param_x", PARAM_ANGULAR_SPRING_STIFFNESS);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_x/damping"), "set_param_x", "get_param_x", PARAM_ANGULAR_SPRING_DAMPING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_x/equilibrium_point", PROPERTY_HINT_RANGE, "-180,180,0.01,radians_as_degrees"), "set_param_x", "get_param_x", PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_drive_x/torque_limit", PROPERTY_HINT_NONE, U"suffix:kg⋅m²/s² (Nm)"), "set_param_x", "get_param_x", PARAM_ANGULAR_DRIVE_TORQUE_LIMIT);
 
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "angular_spring_y/enabled"), "set_flag_y", "get_flag_y", FLAG_ENABLE_ANGULAR_SPRING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_y/stiffness"), "set_param_y", "get_param_y", PARAM_ANGULAR_SPRING_STIFFNESS);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_y/damping"), "set_param_y", "get_param_y", PARAM_ANGULAR_SPRING_DAMPING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_y/equilibrium_point", PROPERTY_HINT_RANGE, "-180,180,0.01,radians_as_degrees"), "set_param_y", "get_param_y", PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_drive_y/torque_limit", PROPERTY_HINT_NONE, U"suffix:kg⋅m²/s² (Nm)"), "set_param_y", "get_param_y", PARAM_ANGULAR_DRIVE_TORQUE_LIMIT);
 
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "angular_spring_z/enabled"), "set_flag_z", "get_flag_z", FLAG_ENABLE_ANGULAR_SPRING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_z/stiffness"), "set_param_z", "get_param_z", PARAM_ANGULAR_SPRING_STIFFNESS);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_z/damping"), "set_param_z", "get_param_z", PARAM_ANGULAR_SPRING_DAMPING);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_spring_z/equilibrium_point", PROPERTY_HINT_RANGE, "-180,180,0.01,radians_as_degrees"), "set_param_z", "get_param_z", PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_drive_z/torque_limit", PROPERTY_HINT_NONE, U"suffix:kg⋅m²/s² (Nm)"), "set_param_z", "get_param_z", PARAM_ANGULAR_DRIVE_TORQUE_LIMIT);
 
 	BIND_ENUM_CONSTANT(PARAM_LINEAR_LOWER_LIMIT);
 	BIND_ENUM_CONSTANT(PARAM_LINEAR_UPPER_LIMIT);
@@ -187,6 +193,8 @@ void Generic6DOFJoint3D::_bind_methods() {
 	BIND_ENUM_CONSTANT(PARAM_ANGULAR_SPRING_STIFFNESS);
 	BIND_ENUM_CONSTANT(PARAM_ANGULAR_SPRING_DAMPING);
 	BIND_ENUM_CONSTANT(PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT);
+	BIND_ENUM_CONSTANT(PARAM_LINEAR_DRIVE_FORCE_LIMIT);
+	BIND_ENUM_CONSTANT(PARAM_ANGULAR_DRIVE_TORQUE_LIMIT);
 	BIND_ENUM_CONSTANT(PARAM_MAX);
 
 	BIND_ENUM_CONSTANT(FLAG_ENABLE_LINEAR_LIMIT);
@@ -337,6 +345,8 @@ Generic6DOFJoint3D::Generic6DOFJoint3D() {
 	set_param_x(PARAM_ANGULAR_SPRING_STIFFNESS, 0);
 	set_param_x(PARAM_ANGULAR_SPRING_DAMPING, 0);
 	set_param_x(PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT, 0);
+	set_param_x(PARAM_LINEAR_DRIVE_FORCE_LIMIT, FLT_MAX);
+	set_param_x(PARAM_ANGULAR_DRIVE_TORQUE_LIMIT, FLT_MAX);
 
 	set_flag_x(FLAG_ENABLE_ANGULAR_LIMIT, true);
 	set_flag_x(FLAG_ENABLE_LINEAR_LIMIT, true);
@@ -367,6 +377,8 @@ Generic6DOFJoint3D::Generic6DOFJoint3D() {
 	set_param_y(PARAM_ANGULAR_SPRING_STIFFNESS, 0);
 	set_param_y(PARAM_ANGULAR_SPRING_DAMPING, 0);
 	set_param_y(PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT, 0);
+	set_param_y(PARAM_LINEAR_DRIVE_FORCE_LIMIT, FLT_MAX);
+	set_param_y(PARAM_ANGULAR_DRIVE_TORQUE_LIMIT, FLT_MAX);
 
 	set_flag_y(FLAG_ENABLE_ANGULAR_LIMIT, true);
 	set_flag_y(FLAG_ENABLE_LINEAR_LIMIT, true);
@@ -397,6 +409,8 @@ Generic6DOFJoint3D::Generic6DOFJoint3D() {
 	set_param_z(PARAM_ANGULAR_SPRING_STIFFNESS, 0);
 	set_param_z(PARAM_ANGULAR_SPRING_DAMPING, 0);
 	set_param_z(PARAM_ANGULAR_SPRING_EQUILIBRIUM_POINT, 0);
+	set_param_z(PARAM_LINEAR_DRIVE_FORCE_LIMIT, FLT_MAX);
+	set_param_z(PARAM_ANGULAR_DRIVE_TORQUE_LIMIT, FLT_MAX);
 
 	set_flag_z(FLAG_ENABLE_ANGULAR_LIMIT, true);
 	set_flag_z(FLAG_ENABLE_LINEAR_LIMIT, true);

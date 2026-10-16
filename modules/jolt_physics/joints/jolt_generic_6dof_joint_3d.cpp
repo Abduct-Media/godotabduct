@@ -330,6 +330,12 @@ double JoltGeneric6DOFJoint3D::get_param(Axis p_axis, Param p_param) const {
 		case JoltPhysicsServer3D::G6DOF_JOINT_ANGULAR_SPRING_EQUILIBRIUM_POINT: {
 			return spring_equilibrium[axis_ang];
 		}
+		case PhysicsServer3D::G6DOF_JOINT_LINEAR_DRIVE_FORCE_LIMIT: {
+			return spring_limit[axis_lin];
+		}
+		case PhysicsServer3D::G6DOF_JOINT_ANGULAR_DRIVE_TORQUE_LIMIT: {
+			return spring_limit[axis_ang];
+		}
 		default: {
 			ERR_FAIL_V_MSG(0.0, vformat("Unhandled parameter: '%d'. This should not happen. Please report this.", p_param));
 		}
@@ -436,6 +442,14 @@ void JoltGeneric6DOFJoint3D::set_param(Axis p_axis, Param p_param, double p_valu
 		case JoltPhysicsServer3D::G6DOF_JOINT_ANGULAR_SPRING_EQUILIBRIUM_POINT: {
 			spring_equilibrium[axis_ang] = p_value;
 			_spring_equilibrium_changed(axis_ang);
+		} break;
+		case PhysicsServer3D::G6DOF_JOINT_LINEAR_DRIVE_FORCE_LIMIT: {
+			spring_limit[axis_lin] = p_value;
+			_spring_limit_changed(axis_lin);
+		} break;
+		case PhysicsServer3D::G6DOF_JOINT_ANGULAR_DRIVE_TORQUE_LIMIT: {
+			spring_limit[axis_ang] = p_value;
+			_spring_limit_changed(axis_ang);
 		} break;
 		default: {
 			ERR_FAIL_MSG(vformat("Unhandled parameter: '%d'. This should not happen. Please report this.", p_param));
