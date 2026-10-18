@@ -496,8 +496,8 @@ public:
 	bool generic_6dof_joint_get_jolt_flag(RID p_joint, Vector3::Axis p_axis, G6DOFJointAxisFlagJolt p_flag) const;
 	void generic_6dof_joint_set_jolt_flag(RID p_joint, Vector3::Axis p_axis, G6DOFJointAxisFlagJolt p_flag, bool p_enabled);
 
-	float generic_6dof_joint_get_applied_force(RID p_joint);
-	float generic_6dof_joint_get_applied_torque(RID p_joint);
+	virtual real_t generic_6dof_joint_get_applied_force(RID p_joint) const override;
+	virtual real_t generic_6dof_joint_get_applied_torque(RID p_joint) const override;
 };
 
 VARIANT_ENUM_CAST(JoltPhysicsServer3D::HingeJointParamJolt)

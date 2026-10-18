@@ -796,6 +796,11 @@ public:
 	virtual void generic_6dof_joint_set_flag(RID p_joint, Vector3::Axis, G6DOFJointAxisFlag p_flag, bool p_enable) = 0;
 	virtual bool generic_6dof_joint_get_flag(RID p_joint, Vector3::Axis, G6DOFJointAxisFlag p_flag) const = 0;
 
+	// The force and torque the joint applied in the last step (magnitudes, constraint and drives);
+	// 0 for servers that don't measure them.
+	virtual real_t generic_6dof_joint_get_applied_force(RID p_joint) const { return 0; }
+	virtual real_t generic_6dof_joint_get_applied_torque(RID p_joint) const { return 0; }
+
 	/* QUERY API */
 
 	enum AreaBodyStatus {

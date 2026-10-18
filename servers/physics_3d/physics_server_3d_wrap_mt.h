@@ -382,6 +382,8 @@ public:
 
 	FUNC4(generic_6dof_joint_set_flag, RID, Vector3::Axis, G6DOFJointAxisFlag, bool)
 	FUNC3RC(bool, generic_6dof_joint_get_flag, RID, Vector3::Axis, G6DOFJointAxisFlag)
+	FUNC1RC(real_t, generic_6dof_joint_get_applied_force, RID)
+	FUNC1RC(real_t, generic_6dof_joint_get_applied_torque, RID)
 
 	FUNC1RC(JointType, joint_get_type, RID);
 
