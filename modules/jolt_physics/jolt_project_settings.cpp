@@ -39,6 +39,7 @@ void JoltProjectSettings::register_settings() {
 	GLOBAL_DEF(PropertyInfo(Variant::BOOL, "physics/jolt_physics_3d/simulation/use_enhanced_internal_edge_removal"), true);
 	GLOBAL_DEF(PropertyInfo(Variant::BOOL, "physics/jolt_physics_3d/simulation/generate_all_kinematic_contacts"), false);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "physics/jolt_physics_3d/simulation/penetration_slop", PROPERTY_HINT_RANGE, U"0,1,0.00001,or_greater,suffix:m"), 0.02f);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "physics/jolt_physics_3d/simulation/max_contact_mass_ratio", PROPERTY_HINT_RANGE, U"0,1000,0.1,or_greater"), 0.0f);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "physics/jolt_physics_3d/simulation/speculative_contact_distance", PROPERTY_HINT_RANGE, U"0,1,0.00001,or_greater,suffix:m"), 0.02f);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "physics/jolt_physics_3d/simulation/baumgarte_stabilization_factor", PROPERTY_HINT_RANGE, U"0,1,0.01"), 0.2f);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "physics/jolt_physics_3d/simulation/soft_body_point_radius", PROPERTY_HINT_RANGE, U"0,1,0.001,or_greater,suffix:m"), 0.01f);
@@ -83,6 +84,7 @@ void JoltProjectSettings::read_settings() {
 	use_enhanced_internal_edge_removal_for_bodies = GLOBAL_GET("physics/jolt_physics_3d/simulation/use_enhanced_internal_edge_removal");
 	generate_all_kinematic_contacts = GLOBAL_GET("physics/jolt_physics_3d/simulation/generate_all_kinematic_contacts");
 	penetration_slop = GLOBAL_GET("physics/jolt_physics_3d/simulation/penetration_slop");
+	max_contact_mass_ratio = GLOBAL_GET("physics/jolt_physics_3d/simulation/max_contact_mass_ratio");
 	speculative_contact_distance = GLOBAL_GET("physics/jolt_physics_3d/simulation/speculative_contact_distance");
 	baumgarte_stabilization_factor = GLOBAL_GET("physics/jolt_physics_3d/simulation/baumgarte_stabilization_factor");
 	soft_body_point_radius = GLOBAL_GET("physics/jolt_physics_3d/simulation/soft_body_point_radius");

@@ -42,6 +42,7 @@
 
 void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	_try_override_collision_response(p_body1, p_body2, p_settings);
+	_try_limit_mass_ratio(p_body1, p_body2, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
 	_try_evaluate_area_overlap(p_body1, p_body2, p_manifold.mSubShapeID1, p_manifold.mSubShapeID2);
@@ -53,6 +54,7 @@ void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::
 
 void JoltContactListener3D::OnContactPersisted(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	_try_override_collision_response(p_body1, p_body2, p_settings);
+	_try_limit_mass_ratio(p_body1, p_body2, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
 	_try_evaluate_area_overlap(p_body1, p_body2, p_manifold.mSubShapeID1, p_manifold.mSubShapeID2);
@@ -134,6 +136,50 @@ bool JoltContactListener3D::_try_override_collision_response(const JPH::Body &p_
 	}
 
 	return true;
+}
+
+// Jolt's iterative solver can't let a light body carry a much heavier one: the
+// heavy body sinks it into what it rests on. Within this contact only, the
+// lighter of two dynamic bodies acts as heavy as the heavier one divided by
+// max_contact_mass_ratio (Jolt's ContactSettings inverse mass scale, as in its
+// ModifyMassTest sample). The masses don't change between steps, so the scale
+// stays the same for a pair over time, as Jolt asks. Off at 0. Contacts already
+// made one-way (_try_override_collision_response) are left as they are.
+bool JoltContactListener3D::_try_limit_mass_ratio(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, JPH::ContactSettings &p_settings) {
+	const float max_ratio = JoltProjectSettings::max_contact_mass_ratio;
+	if (max_ratio <= 0.0f) {
+		return false;
+	}
+
+	if (!p_jolt_body1.IsDynamic() || !p_jolt_body2.IsDynamic()) {
+		return false;
+	}
+
+	if (p_settings.mInvMassScale1 != 1.0f || p_settings.mInvMassScale2 != 1.0f) {
+		return false;
+	}
+
+	const float inverse_mass1 = p_jolt_body1.GetMotionPropertiesUnchecked()->GetInverseMass();
+	const float inverse_mass2 = p_jolt_body2.GetMotionPropertiesUnchecked()->GetInverseMass();
+	if (inverse_mass1 <= 0.0f || inverse_mass2 <= 0.0f) {
+		return false;
+	}
+
+	if (inverse_mass1 > inverse_mass2 * max_ratio) {
+		const float scale = inverse_mass2 * max_ratio / inverse_mass1;
+		p_settings.mInvMassScale1 = scale;
+		p_settings.mInvInertiaScale1 = scale;
+		return true;
+	}
+
+	if (inverse_mass2 > inverse_mass1 * max_ratio) {
+		const float scale = inverse_mass1 * max_ratio / inverse_mass2;
+		p_settings.mInvMassScale2 = scale;
+		p_settings.mInvInertiaScale2 = scale;
+		return true;
+	}
+
+	return false;
 }
 
 bool JoltContactListener3D::_try_apply_surface_velocities(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, JPH::ContactSettings &p_settings) {
