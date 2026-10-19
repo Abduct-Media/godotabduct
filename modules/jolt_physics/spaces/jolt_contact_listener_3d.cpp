@@ -42,7 +42,7 @@
 
 void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	_try_override_collision_response(p_body1, p_body2, p_settings);
-	_try_limit_mass_ratio(p_body1, p_body2, p_settings);
+	_try_limit_mass_ratio(p_body1, p_body2, p_manifold, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
 	_try_evaluate_area_overlap(p_body1, p_body2, p_manifold.mSubShapeID1, p_manifold.mSubShapeID2);
@@ -54,7 +54,7 @@ void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::
 
 void JoltContactListener3D::OnContactPersisted(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	_try_override_collision_response(p_body1, p_body2, p_settings);
-	_try_limit_mass_ratio(p_body1, p_body2, p_settings);
+	_try_limit_mass_ratio(p_body1, p_body2, p_manifold, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
 	_try_evaluate_area_overlap(p_body1, p_body2, p_manifold.mSubShapeID1, p_manifold.mSubShapeID2);
@@ -139,13 +139,17 @@ bool JoltContactListener3D::_try_override_collision_response(const JPH::Body &p_
 }
 
 // Jolt's iterative solver can't let a light body carry a much heavier one: the
-// heavy body sinks it into what it rests on. Within this contact only, the
-// lighter of two dynamic bodies acts as heavy as the heavier one divided by
-// max_contact_mass_ratio (Jolt's ContactSettings inverse mass scale, as in its
-// ModifyMassTest sample). The masses don't change between steps, so the scale
-// stays the same for a pair over time, as Jolt asks. Off at 0. Contacts already
-// made one-way (_try_override_collision_response) are left as they are.
-bool JoltContactListener3D::_try_limit_mass_ratio(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, JPH::ContactSettings &p_settings) {
+// heavy body sinks it into what it rests on. Within this contact only, when the
+// heavier of two dynamic bodies rests on the lighter one (the contact normal
+// within 60 degrees of up, the heavy body's centre of mass above), the lighter one acts as heavy
+// as the heavier one divided by max_contact_mass_ratio (Jolt's ContactSettings
+// inverse mass scale, as in its ModifyMassTest sample). Only from above, so a
+// light body thrown or pushed sideways at a heavy one still hits like a light
+// one (momentum isn't conserved in a scaled contact). The masses don't change
+// between steps, so the scale stays the same for a resting pair over time, as
+// Jolt asks. Off at 0. Contacts already made one-way
+// (_try_override_collision_response) are left as they are.
+bool JoltContactListener3D::_try_limit_mass_ratio(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	const float max_ratio = JoltProjectSettings::max_contact_mass_ratio;
 	if (max_ratio <= 0.0f) {
 		return false;
@@ -165,14 +169,34 @@ bool JoltContactListener3D::_try_limit_mass_ratio(const JPH::Body &p_jolt_body1,
 		return false;
 	}
 
-	if (inverse_mass1 > inverse_mass2 * max_ratio) {
+	// Godot applies gravity itself (Jolt's is zero): the default area has it.
+	const JoltArea3D *default_area = space->get_default_area();
+	if (default_area == nullptr) {
+		return false;
+	}
+
+	const JPH::Vec3 gravity = to_jolt(default_area->get_gravity_vector());
+	if (gravity.LengthSq() <= 0.0f) {
+		return false;
+	}
+
+	const JPH::Vec3 up = -gravity.Normalized();
+	constexpr float ON_TOP = 0.5f; // cos(60 degrees)
+	if (JPH::abs(p_manifold.mWorldSpaceNormal.Dot(up)) < ON_TOP) {
+		return false;
+	}
+
+	// Which one is above, by their centres of mass (not the normal's sign).
+	const float body2_above = JPH::Vec3(p_jolt_body2.GetCenterOfMassPosition() - p_jolt_body1.GetCenterOfMassPosition()).Dot(up);
+
+	if (inverse_mass1 > inverse_mass2 * max_ratio && body2_above > 0.0f) {
 		const float scale = inverse_mass2 * max_ratio / inverse_mass1;
 		p_settings.mInvMassScale1 = scale;
 		p_settings.mInvInertiaScale1 = scale;
 		return true;
 	}
 
-	if (inverse_mass2 > inverse_mass1 * max_ratio) {
+	if (inverse_mass2 > inverse_mass1 * max_ratio && body2_above < 0.0f) {
 		const float scale = inverse_mass1 * max_ratio / inverse_mass2;
 		p_settings.mInvMassScale2 = scale;
 		p_settings.mInvInertiaScale2 = scale;
