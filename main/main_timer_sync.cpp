@@ -32,6 +32,10 @@
 
 #include "core/os/os.h"
 #include "servers/display/display_server.h"
+#ifndef XR_DISABLED
+#include "servers/xr/xr_interface.h"
+#include "servers/xr/xr_server.h"
+#endif // XR_DISABLED
 
 // Uncomment this define to get more debugging logs for the delta smoothing.
 // #define GODOT_DEBUG_DELTA_SMOOTHER
@@ -49,6 +53,19 @@ void MainFrameTime::clamp_process_step(double min_process_step, double max_proce
 }
 
 /////////////////////////////////
+
+// True while an initialized XR interface is the primary one: its runtime then
+// paces the frames to the headset's display (OpenXR's xrWaitFrame), as vsync would.
+static bool _xr_paces_frames() {
+#ifndef XR_DISABLED
+	XRServer *xr_server = XRServer::get_singleton();
+	if (xr_server) {
+		Ref<XRInterface> primary = xr_server->get_primary_interface();
+		return primary.is_valid() && primary->is_initialized();
+	}
+#endif // XR_DISABLED
+	return false;
+}
 
 void MainTimerSync::DeltaSmoother::made_new_estimate() {
 	_hits_above_estimated = 0;
@@ -262,8 +279,10 @@ int64_t MainTimerSync::DeltaSmoother::smooth_delta(int64_t p_delta) {
 	}
 
 	// only attempt smoothing if vsync is selected
+	// (or an XR runtime paces the frames: it blocks each frame until its display slot,
+	// like vsync, while the window's own vsync mode may report disabled)
 	DisplayServerEnums::VSyncMode vsync_mode = DisplayServer::get_singleton()->window_get_vsync_mode(DisplayServerEnums::MAIN_WINDOW_ID);
-	if (vsync_mode != DisplayServerEnums::VSYNC_ENABLED) {
+	if (vsync_mode != DisplayServerEnums::VSYNC_ENABLED && !_xr_paces_frames()) {
 		return p_delta;
 	}
 
