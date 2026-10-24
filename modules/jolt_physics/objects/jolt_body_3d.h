@@ -33,6 +33,8 @@
 #include "jolt_physics_direct_body_state_3d.h"
 #include "jolt_shaped_object_3d.h"
 
+#include <atomic>
+
 class JoltArea3D;
 class JoltJoint3D;
 class JoltSoftBody3D;
@@ -245,8 +247,30 @@ public:
 	void remove_area(JoltArea3D *p_area);
 	void update_area(JoltArea3D *p_area, bool p_priority_changed = false);
 
+	// DwarvenIndustry: mass lift (JoltContactListener3D::_lift_masses). Written from
+	// Jolt's contact callbacks on several threads, without a lock: the upward impulse
+	// dynamic bodies resting on this one took from it in the last step; the mass of a
+	// much heavier body about to rest on it (kg); the most the load can count for
+	// (kg), the heaviest body resting on it as Jolt has it; and the listener's step
+	// it was last listed in.
+	std::atomic<float> resting_load_impulse = 0.0f;
+	std::atomic<float> anticipated_load = 0.0f;
+	std::atomic<float> resting_load_cap = 0.0f;
+	std::atomic<uint32_t> resting_listed_step = 0;
+	// DwarvenIndustry: the rest, only in the listener's pre-step: whether the mass is
+	// lifted, the load as mass (kg) smoothed over steps, and the step it was last
+	// looked at in.
+	bool mass_lifted = false;
+	float resting_load = 0.0f;
+	uint32_t lift_seen_step = 0;
+
 	void add_joint(JoltJoint3D *p_joint);
 	void remove_joint(JoltJoint3D *p_joint);
+
+	// DwarvenIndustry: whether a joint ties this body to something that isn't a
+	// rigid body (a static or kinematic body, or the world), as a claw's body is
+	// to its drive (JoltContactListener3D::_note_resting_load).
+	bool is_anchored() const;
 
 	void call_queries();
 

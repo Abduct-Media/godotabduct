@@ -91,6 +91,19 @@ class JoltContactListener3D final
 	Mutex write_mutex;
 	JoltSpace3D *space = nullptr;
 
+	// DwarvenIndustry: mass lift. The bodies that carried a resting load this step
+	// (filled from the contact callbacks: a slot each, by the atomic count, sized for
+	// the most bodies Jolt holds), those whose mass is lifted or still have a load,
+	// a list to swap with that one, the step count (the bodies' stamps), and up and
+	// gravity's strength for this step (zero without gravity).
+	LocalVector<JPH::BodyID> loaded_bodies;
+	std::atomic<uint32_t> loaded_count = 0;
+	LocalVector<JPH::BodyID> lifted_bodies;
+	LocalVector<JPH::BodyID> lifted_next;
+	uint32_t lift_step = 1;
+	JPH::Vec3 resting_up = JPH::Vec3::sZero();
+	float resting_gravity = 0.0f;
+
 #ifdef DEBUG_ENABLED
 	PackedVector3Array debug_contacts;
 	std::atomic_int debug_contact_count = 0;
@@ -106,6 +119,9 @@ class JoltContactListener3D final
 	bool _try_override_collision_response(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, JPH::ContactSettings &p_settings);
 	bool _try_override_collision_response(const JPH::Body &p_jolt_soft_body, const JPH::Body &p_jolt_other_body, JPH::SoftBodyContactSettings &p_settings);
 	bool _try_apply_surface_velocities(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, JPH::ContactSettings &p_settings);
+	void _note_resting_load(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings);
+	void _lift_masses();
+	void _lift_mass(JPH::Body &p_jolt_body, JoltBody3D &p_body, float p_ratio, float p_step, float p_gravity);
 	bool _try_limit_mass_ratio(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings);
 	bool _try_add_contacts(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings);
 	bool _try_evaluate_area_overlap(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::SubShapeID &p_shape_id1, const JPH::SubShapeID &p_shape_id2);

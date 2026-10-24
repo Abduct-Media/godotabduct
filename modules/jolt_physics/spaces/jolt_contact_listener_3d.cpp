@@ -43,6 +43,7 @@
 void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	_try_override_collision_response(p_body1, p_body2, p_settings);
 	_try_limit_mass_ratio(p_body1, p_body2, p_manifold, p_settings);
+	_note_resting_load(p_body1, p_body2, p_manifold, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
 	_try_evaluate_area_overlap(p_body1, p_body2, p_manifold.mSubShapeID1, p_manifold.mSubShapeID2);
@@ -55,6 +56,7 @@ void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::
 void JoltContactListener3D::OnContactPersisted(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
 	_try_override_collision_response(p_body1, p_body2, p_settings);
 	_try_limit_mass_ratio(p_body1, p_body2, p_manifold, p_settings);
+	_note_resting_load(p_body1, p_body2, p_manifold, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
 	_try_evaluate_area_overlap(p_body1, p_body2, p_manifold.mSubShapeID1, p_manifold.mSubShapeID2);
@@ -204,6 +206,229 @@ bool JoltContactListener3D::_try_limit_mass_ratio(const JPH::Body &p_jolt_body1,
 	}
 
 	return false;
+}
+
+// _lift_masses lifts a body to its load / (ratio x this), clear of the ratio: at
+// the ratio exactly, a contact with max_contact_mass_ratio at the same value
+// switched its scale on and off with every small change in the load, and the stack
+// shook. _note_resting_load skips the bodies on top lighter than true mass x ratio
+// x this, which could never lift it.
+static constexpr float LIFT_MARGIN = 0.8f;
+
+// Lock-free float add and max, for loads written by several threads.
+static void atomic_add(std::atomic<float> &r_value, float p_add) {
+	float old = r_value.load(std::memory_order_relaxed);
+	while (!r_value.compare_exchange_weak(old, old + p_add, std::memory_order_relaxed)) {
+	}
+}
+
+static void atomic_max(std::atomic<float> &r_value, float p_other) {
+	float old = r_value.load(std::memory_order_relaxed);
+	while (p_other > old && !r_value.compare_exchange_weak(old, p_other, std::memory_order_relaxed)) {
+	}
+}
+
+// Adds the vertical part of the last step's impulse of a resting contact between
+// two dynamic bodies (the normal within 60 degrees of up) to the lower body's
+// load, for _lift_masses.
+void JoltContactListener3D::_note_resting_load(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
+	if (JoltProjectSettings::max_resting_mass_ratio <= 0.0f || resting_gravity <= 0.0f) {
+		return;
+	}
+
+	if (!p_jolt_body1.IsDynamic() || !p_jolt_body2.IsDynamic() || p_jolt_body1.IsSensor() || p_jolt_body2.IsSensor()) {
+		return;
+	}
+
+	const float along_up = p_manifold.mWorldSpaceNormal.Dot(resting_up);
+	if (JPH::abs(along_up) < 0.5f) {
+		return;
+	}
+
+	// The impulse acts along the normal on body 2: body 1 is below when it points up.
+	const JPH::Body &lower = along_up > 0.0f ? p_jolt_body1 : p_jolt_body2;
+	const JPH::Body &upper = along_up > 0.0f ? p_jolt_body2 : p_jolt_body1;
+	JoltBody3D *body = reinterpret_cast<JoltBody3D *>(lower.GetUserData());
+
+	// A body anchored to the world (a claw's or a hand's own body, on its drive)
+	// presses with its drive, not its weight: the empty claw pressed into a pile
+	// lifted the pill and the cube under it, and the hand shook.
+	if (reinterpret_cast<JoltBody3D *>(upper.GetUserData())->is_anchored()) {
+		return;
+	}
+
+	// A body on top too light to ever lift this one (the load is capped by it, in
+	// _lift_masses) counts for nothing: skipping it here keeps a pile of like
+	// boxes out of the bookkeeping and the lists (a 300-box pile cost 11% more).
+	const float upper_mass_now = 1.0f / upper.GetMotionPropertiesUnchecked()->GetInverseMass();
+	if (upper_mass_now <= body->get_mass() * JoltProjectSettings::max_resting_mass_ratio * LIFT_MARGIN) {
+		return;
+	}
+
+	// A contact with no impulse yet (new, or about to touch: Jolt finds contacts
+	// a little ahead) with a much heavier body on top: expect its weight at once,
+	// so the light body is heavy before the impact instead of a few steps after
+	// (a 60 kg anvil dropped 30 cm sank 67 mm into a can, waiting for the load).
+	const float upper_mass = reinterpret_cast<JoltBody3D *>(upper.GetUserData())->get_mass();
+	const bool anticipate = p_settings.mPreviousNormalImpulse <= 0.0f && upper_mass > body->get_mass() * JoltProjectSettings::max_resting_mass_ratio;
+	if (p_settings.mPreviousNormalImpulse <= 0.0f && !anticipate) {
+		return;
+	}
+
+	// Until the lift lands (next step), in this contact only, the light body acts as
+	// heavy as it will be lifted, so a body landing on it fast doesn't sink in on the
+	// step of the impact (an anvil dropped 30 cm dipped 24 mm into a can). Safe to
+	// switch: the contact has no impulse for Jolt to start from, and next step's real
+	// mass is the same.
+	if (anticipate && p_settings.mInvMassScale1 == 1.0f && p_settings.mInvMassScale2 == 1.0f) {
+		const float lifted = upper_mass / (JoltProjectSettings::max_resting_mass_ratio * LIFT_MARGIN);
+		const float light_now = 1.0f / lower.GetMotionPropertiesUnchecked()->GetInverseMass();
+		if (lifted > light_now) {
+			const float scale = light_now / lifted;
+			if (&lower == &p_jolt_body1) {
+				p_settings.mInvMassScale1 = scale;
+				p_settings.mInvInertiaScale1 = scale;
+			} else {
+				p_settings.mInvMassScale2 = scale;
+				p_settings.mInvInertiaScale2 = scale;
+			}
+		}
+	}
+
+	// No lock: Jolt calls this from several threads at once, and a lock here (shared
+	// with the contact reports) made a pile with an anvil on it 5% slower.
+	if (body->resting_listed_step.exchange(lift_step, std::memory_order_relaxed) != lift_step) {
+		const uint32_t slot = loaded_count.fetch_add(1, std::memory_order_relaxed);
+		if (slot < loaded_bodies.size()) {
+			loaded_bodies[slot] = lower.GetID();
+		}
+	}
+	atomic_max(body->resting_load_cap, upper_mass_now);
+	if (anticipate) {
+		atomic_max(body->anticipated_load, upper_mass);
+	} else {
+		atomic_add(body->resting_load_impulse, p_settings.mPreviousNormalImpulse * JPH::abs(along_up));
+	}
+}
+
+// Jolt's iterative solver can't hold a much heavier body up on a light one. With
+// max_resting_mass_ratio, a body carrying a load (_note_resting_load, the last
+// step's) really gets heavier: at least load / ratio, inertia scaled alike, so
+// every contact and joint sees the same masses and passes the whole weight on.
+// (Use it instead of max_contact_mass_ratio: both on one pair, the contact scale
+// switched as the lift came and went, and a crate with a box in it shook apart.)
+// Gravity still uses its true mass (JoltBody3D::_integrate_forces). The load is
+// smoothed over about a quarter second (a jerk pushes harder than the weight,
+// and lifting for it made a held tray lag twice as far), and the mass changes at
+// most x1.25 up or x0.8 down a step. It never adds energy: going up, momentum is
+// kept (velocities scale down); going down, velocities are kept. Sleeping
+// bodies keep their mass. One pass over the bodies loaded or lifted.
+void JoltContactListener3D::_lift_masses() {
+	const float ratio = JoltProjectSettings::max_resting_mass_ratio;
+	const float step = space->get_last_step();
+
+	// Up and gravity for this step's contacts (_note_resting_load).
+	const JoltArea3D *default_area = space->get_default_area();
+	const Vector3 gravity = default_area != nullptr ? default_area->get_gravity_vector() : Vector3();
+	resting_gravity = gravity.length();
+	resting_up = resting_gravity > 0.0f ? to_jolt(-gravity / resting_gravity) : JPH::Vec3::sZero();
+	const float g = resting_gravity;
+
+	JPH::PhysicsSystem &system = space->get_physics_system();
+	const JPH::BodyLockInterfaceNoLock &bodies = system.GetBodyLockInterfaceNoLock();
+
+	// Every body loaded in the last step (listed once each by its stamp) or still
+	// lifted, each once (by a second stamp). The lists keep their capacity.
+	const uint32_t loaded = MIN(loaded_count.load(std::memory_order_relaxed), loaded_bodies.size());
+	const uint32_t step_seen = lift_step;
+	lifted_next.clear();
+	auto visit = [&](const JPH::BodyID &id) {
+		JPH::Body *jolt_body = bodies.TryGetBody(id);
+		if (jolt_body == nullptr || !jolt_body->IsDynamic()) {
+			return;
+		}
+
+		JoltBody3D *body = reinterpret_cast<JoltBody3D *>(jolt_body->GetUserData());
+		if (body->lift_seen_step == step_seen) {
+			return;
+		}
+		body->lift_seen_step = step_seen;
+		_lift_mass(*jolt_body, *body, ratio, step, g);
+	};
+	for (const JPH::BodyID &id : lifted_bodies) {
+		visit(id);
+	}
+	for (uint32_t i = 0; i < loaded; ++i) {
+		visit(loaded_bodies[i]);
+	}
+	SWAP(lifted_bodies, lifted_next);
+
+	// The next step's stamps (0 is never one) and a slot for every body Jolt can hold.
+	lift_step = lift_step == UINT32_MAX ? 1 : lift_step + 1;
+	loaded_count.store(0, std::memory_order_relaxed);
+	if (ratio > 0.0f && loaded_bodies.size() < system.GetMaxBodies()) {
+		loaded_bodies.resize(system.GetMaxBodies());
+	}
+}
+
+// One body's step of _lift_masses; keeps it in the lifted list while it is lifted
+// or still has a load.
+void JoltContactListener3D::_lift_mass(JPH::Body &p_jolt_body, JoltBody3D &p_body, float p_ratio, float p_step, float p_gravity) {
+	constexpr float LOAD_SMOOTHING = 0.25f;
+	const JPH::BodyID id = p_jolt_body.GetID();
+	const float load_impulse = p_body.resting_load_impulse.exchange(0.0f, std::memory_order_relaxed);
+	const float cap = p_body.resting_load_cap.exchange(0.0f, std::memory_order_relaxed);
+	const float anticipated = p_body.anticipated_load.exchange(0.0f, std::memory_order_relaxed);
+	if (!p_jolt_body.IsActive()) {
+		if (p_body.mass_lifted || p_body.resting_load > 0.0f) {
+			lifted_next.push_back(id);
+		}
+		return;
+	}
+
+	const float true_mass = p_body.get_mass();
+	JPH::MotionProperties *motion = p_jolt_body.GetMotionPropertiesUnchecked();
+	const float current = 1.0f / motion->GetInverseMass();
+
+	// The measured load, no more than the heaviest body resting on this one: the
+	// solver's trouble is the mass ratio between two touching bodies, not the load.
+	// Uncapped, the bottom of three 1 kg boxes and a ragdoll's legs were lifted, and
+	// a hand pressing a stick onto a part lifted the part, differently on each peer
+	// of a networked game.
+	const float load = (p_ratio > 0.0f && p_step > 0.0f && p_gravity > 0.0f) ? MIN(load_impulse / (p_step * p_gravity), cap) : 0.0f;
+	p_body.resting_load += (load - p_body.resting_load) * LOAD_SMOOTHING;
+	// An expected load (_note_resting_load) counts at once, past the smoothing and
+	// the rate limit.
+	p_body.resting_load = MAX(p_body.resting_load, anticipated);
+	if (p_body.resting_load < true_mass * 0.01f) {
+		p_body.resting_load = 0.0f;
+	}
+
+	const float target = p_ratio > 0.0f ? MAX(true_mass, p_body.resting_load / (p_ratio * LIFT_MARGIN)) : true_mass;
+	float next = CLAMP(target, current * 0.8f, current * 1.25f);
+	if (anticipated > 0.0f) {
+		next = MAX(next, target);
+	}
+	if (next <= true_mass * 1.001f) {
+		if (p_body.mass_lifted) {
+			motion->ScaleToMass(true_mass);
+			p_body.mass_lifted = false;
+		}
+		if (p_body.resting_load > 0.0f) {
+			lifted_next.push_back(id);
+		}
+		return;
+	}
+
+	motion->ScaleToMass(next);
+	if (next > current) {
+		// Momentum kept: velocities scale down with the mass.
+		const float keep = current / next;
+		motion->SetLinearVelocity(motion->GetLinearVelocity() * keep);
+		motion->SetAngularVelocity(motion->GetAngularVelocity() * keep);
+	}
+	p_body.mass_lifted = true;
+	lifted_next.push_back(id);
 }
 
 bool JoltContactListener3D::_try_apply_surface_velocities(const JPH::Body &p_jolt_body1, const JPH::Body &p_jolt_body2, JPH::ContactSettings &p_settings) {
@@ -625,6 +850,8 @@ void JoltContactListener3D::_clear_area_soft_body_overlaps() {
 
 void JoltContactListener3D::pre_step() {
 	_clear_area_soft_body_overlaps();
+
+	_lift_masses();
 
 #ifdef DEBUG_ENABLED
 	debug_contact_count = 0;

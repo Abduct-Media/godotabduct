@@ -161,7 +161,9 @@ void JoltBody3D::_integrate_forces(float p_step) {
 	angular_velocity *= MAX(1.0f - total_angular_damp * p_step, 0.0f);
 	motion_properties.SetAngularVelocity(angular_velocity);
 
-	jolt_body->AddForce(to_jolt(total_gravity / motion_properties.GetInverseMass() + constant_force));
+	// DwarvenIndustry: a lifted body (JoltContactListener3D::_lift_masses) weighs its true mass.
+	const float gravity_mass = mass_lifted ? mass : 1.0f / motion_properties.GetInverseMass();
+	jolt_body->AddForce(to_jolt(total_gravity * gravity_mass + constant_force));
 	jolt_body->AddTorque(to_jolt(constant_torque));
 }
 
@@ -275,7 +277,21 @@ void JoltBody3D::_on_wake_up() {
 
 void JoltBody3D::_update_mass_properties() {
 	if (in_space()) {
-		jolt_body->GetMotionPropertiesUnchecked()->SetMassProperties(_calculate_allowed_dofs(), _calculate_mass_properties());
+		JPH::MotionProperties *motion = jolt_body->GetMotionPropertiesUnchecked();
+		// DwarvenIndustry: a lifted mass (JoltContactListener3D::_lift_masses) outlasts a
+		// rebuild (a new mass, shape or mode), unless the body stops being rigid or its
+		// new mass is more: rebuilt to the true mass, it would take the rate limit's
+		// steps to rise again, sinking meanwhile.
+		const float lifted = mass_lifted ? 1.0f / motion->GetInverseMass() : 0.0f;
+		motion->SetMassProperties(_calculate_allowed_dofs(), _calculate_mass_properties());
+		if (mass_lifted) {
+			if (is_rigid() && lifted > mass) {
+				motion->ScaleToMass(lifted);
+			} else {
+				mass_lifted = false;
+				resting_load = 0.0f;
+			}
+		}
 	}
 }
 
@@ -1063,6 +1079,16 @@ void JoltBody3D::add_joint(JoltJoint3D *p_joint) {
 	joints.push_back(p_joint);
 
 	_joints_changed();
+}
+
+bool JoltBody3D::is_anchored() const {
+	for (const JoltJoint3D *joint : joints) {
+		const JoltBody3D *other = joint->get_body_a() == this ? joint->get_body_b() : joint->get_body_a();
+		if (other == nullptr || !other->is_rigid()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void JoltBody3D::remove_joint(JoltJoint3D *p_joint) {

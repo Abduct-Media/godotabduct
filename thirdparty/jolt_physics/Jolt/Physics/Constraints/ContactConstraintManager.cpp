@@ -935,6 +935,10 @@ void ContactConstraintManager::GetContactsFromCache(ContactAllocator &ioContactA
 			}
 			manifold.mPenetrationDepth = penetration_depth; // We don't have the penetration depth anymore, estimate it
 
+			// DwarvenIndustry: the impulses the points took last update (copied with them)
+			for (uint32 i = 0; i < output_cm->mNumContactPoints; ++i)
+				settings.mPreviousNormalImpulse += output_cm->mContactPoints[i].mNonPenetrationLambda;
+
 			// Notify callback
 			mContactListener->OnContactPersisted(*body1, *body2, manifold, settings);
 		}
@@ -1088,6 +1092,10 @@ bool ContactConstraintManager::TemplatedAddContactConstraint(ContactAllocator &i
 	const CachedContactPoint *ccp_end;
 	if (old_manifold_kv != nullptr)
 	{
+		// DwarvenIndustry: the impulses the old manifold's points took last update
+		for (uint32 i = 0; i < old_manifold_kv->GetValue().mNumContactPoints; ++i)
+			settings.mPreviousNormalImpulse += old_manifold_kv->GetValue().mContactPoints[i].mNonPenetrationLambda;
+
 		// Call point persisted listener
 		if (mContactListener != nullptr)
 			mContactListener->OnContactPersisted(inBody1, inBody2, inManifold, settings);
