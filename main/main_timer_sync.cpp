@@ -279,10 +279,11 @@ int64_t MainTimerSync::DeltaSmoother::smooth_delta(int64_t p_delta) {
 	}
 
 	// only attempt smoothing if vsync is selected
-	// (or an XR runtime paces the frames: it blocks each frame until its display slot,
-	// like vsync, while the window's own vsync mode may report disabled)
+	// (or, with application/run/delta_smoothing_xr, an XR runtime paces the frames: it
+	// blocks each frame until its display slot, like vsync, while the window's own vsync
+	// mode may report disabled)
 	DisplayServerEnums::VSyncMode vsync_mode = DisplayServer::get_singleton()->window_get_vsync_mode(DisplayServerEnums::MAIN_WINDOW_ID);
-	if (vsync_mode != DisplayServerEnums::VSYNC_ENABLED && !_xr_paces_frames()) {
+	if (vsync_mode != DisplayServerEnums::VSYNC_ENABLED && !(_xr_paced && _xr_paces_frames())) {
 		return p_delta;
 	}
 

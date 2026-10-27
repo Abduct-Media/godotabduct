@@ -45,11 +45,15 @@ class MainTimerSync {
 	public:
 		// pass the recorded delta, returns a smoothed delta
 		int64_t smooth_delta(int64_t p_delta);
+		void set_xr_paced(bool p_enabled) { _xr_paced = p_enabled; }
 
 	private:
 		void made_new_estimate();
 		void update_refresh_rate_estimator(int64_t p_delta);
 		bool fps_allows_smoothing(int64_t p_delta);
+
+		// application/run/delta_smoothing_xr: an XR runtime pacing the frames counts as vsync
+		bool _xr_paced = false;
 
 		// estimated vsync delta (monitor refresh rate)
 		int64_t _vsync_delta = 16666;
@@ -139,6 +143,8 @@ public:
 	void set_cpu_ticks_usec(uint64_t p_cpu_ticks_usec);
 	//set fixed fps
 	void set_fixed_fps(int p_fixed_fps);
+	// let an XR runtime pacing the frames count as vsync for delta smoothing
+	void set_delta_smoothing_xr(bool p_enabled) { _delta_smoother.set_xr_paced(p_enabled); }
 
 	// advance one frame, return timesteps to take
 	MainFrameTime advance(double p_physics_step, int p_physics_ticks_per_second);

@@ -2268,6 +2268,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	if (!delta_smoothing_override) {
 		OS::get_singleton()->set_delta_smoothing(GLOBAL_GET("application/run/delta_smoothing"));
 	}
+	GLOBAL_DEF("application/run/delta_smoothing_xr", false);
 
 	GLOBAL_DEF("debug/settings/stdout/print_fps", false);
 	GLOBAL_DEF("debug/settings/stdout/print_gpu_profile", false);
@@ -4043,6 +4044,7 @@ int Main::start() {
 #endif // TOOLS_ENABLED
 
 	main_timer_sync.init(OS::get_singleton()->get_ticks_usec());
+	main_timer_sync.set_delta_smoothing_xr(GLOBAL_GET("application/run/delta_smoothing_xr"));
 	List<String> args = OS::get_singleton()->get_cmdline_args();
 
 	for (List<String>::Element *E = args.front(); E; E = E->next()) {
