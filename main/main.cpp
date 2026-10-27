@@ -4927,6 +4927,7 @@ bool Main::iteration() {
 
 	const uint64_t ticks = OS::get_singleton()->get_ticks_usec();
 	Engine::get_singleton()->_frame_ticks = ticks;
+	performance->set_timing_stamp(Performance::TIMING_FRAME_BEGIN, ticks);
 	main_timer_sync.set_cpu_ticks_usec(ticks);
 	main_timer_sync.set_fixed_fps(fixed_fps);
 
@@ -4967,6 +4968,7 @@ bool Main::iteration() {
 	GodotProfileZoneGrouped(_profile_zone, "xr_server->_process");
 	XRServer::get_singleton()->_process();
 #endif // XR_DISABLED
+	performance->set_timing_stamp(Performance::TIMING_XR_END, OS::get_singleton()->get_ticks_usec());
 
 	GodotProfileZoneGrouped(_profile_zone, "physics");
 	for (int iters = 0; iters < advance.physics_steps; ++iters) {
@@ -4980,17 +4982,21 @@ bool Main::iteration() {
 		Engine::get_singleton()->_physics_frames++;
 
 		uint64_t physics_begin = OS::get_singleton()->get_ticks_usec();
+		performance->set_timing_stamp(Performance::TIMING_TICK_BEGIN, physics_begin);
 
 		// Prepare the fixed timestep interpolated nodes BEFORE they are updated
 		// by the physics server, otherwise the current and previous transforms
 		// may be the same, and no interpolation takes place.
 		GodotProfileZoneGrouped(_physics_zone, "main loop iteration prepare");
 		OS::get_singleton()->get_main_loop()->iteration_prepare();
+		performance->set_timing_stamp(Performance::TIMING_TICK_PREPARED, OS::get_singleton()->get_ticks_usec());
 
 #ifndef PHYSICS_3D_DISABLED
 		GodotProfileZoneGrouped(_physics_zone, "PhysicsServer3D::sync");
 		PhysicsServer3D::get_singleton()->sync();
+		performance->set_timing_stamp(Performance::TIMING_TICK_SYNCED, OS::get_singleton()->get_ticks_usec());
 		PhysicsServer3D::get_singleton()->flush_queries();
+		performance->set_timing_stamp(Performance::TIMING_TICK_QUERIES_FLUSHED, OS::get_singleton()->get_ticks_usec());
 #endif // PHYSICS_3D_DISABLED
 
 #ifndef PHYSICS_2D_DISABLED
@@ -5031,6 +5037,8 @@ bool Main::iteration() {
 		message_queue->flush();
 #endif // !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 
+		performance->set_timing_stamp(Performance::TIMING_TICK_STEP_BEGIN, OS::get_singleton()->get_ticks_usec());
+
 #ifndef PHYSICS_3D_DISABLED
 		GodotProfileZoneGrouped(_profile_zone, "3D physics");
 		PhysicsServer3D::get_singleton()->end_sync();
@@ -5050,6 +5058,7 @@ bool Main::iteration() {
 
 		physics_process_ticks = MAX(physics_process_ticks, OS::get_singleton()->get_ticks_usec() - physics_begin); // keep the largest one for reference
 		physics_process_max = MAX(OS::get_singleton()->get_ticks_usec() - physics_begin, physics_process_max);
+		performance->set_timing_stamp(Performance::TIMING_TICK_END, OS::get_singleton()->get_ticks_usec());
 
 		Engine::get_singleton()->_in_physics = false;
 	}

@@ -67,6 +67,7 @@ void Performance::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_monitor_modification_time"), &Performance::get_monitor_modification_time);
 	ClassDB::bind_method(D_METHOD("get_custom_monitor_names"), &Performance::get_custom_monitor_names);
 	ClassDB::bind_method(D_METHOD("get_custom_monitor_types"), &Performance::get_custom_monitor_types);
+	ClassDB::bind_method(D_METHOD("get_timing_stamps"), &Performance::get_timing_stamps);
 
 	BIND_ENUM_CONSTANT(TIME_FPS);
 	BIND_ENUM_CONSTANT(TIME_PROCESS);
@@ -141,6 +142,16 @@ void Performance::_bind_methods() {
 	BIND_ENUM_CONSTANT(MONITOR_TYPE_MEMORY);
 	BIND_ENUM_CONSTANT(MONITOR_TYPE_TIME);
 	BIND_ENUM_CONSTANT(MONITOR_TYPE_PERCENTAGE);
+
+	BIND_ENUM_CONSTANT(TIMING_FRAME_BEGIN);
+	BIND_ENUM_CONSTANT(TIMING_XR_END);
+	BIND_ENUM_CONSTANT(TIMING_TICK_BEGIN);
+	BIND_ENUM_CONSTANT(TIMING_TICK_PREPARED);
+	BIND_ENUM_CONSTANT(TIMING_TICK_SYNCED);
+	BIND_ENUM_CONSTANT(TIMING_TICK_QUERIES_FLUSHED);
+	BIND_ENUM_CONSTANT(TIMING_TICK_STEP_BEGIN);
+	BIND_ENUM_CONSTANT(TIMING_TICK_END);
+	BIND_ENUM_CONSTANT(TIMING_MAX);
 }
 
 int Performance::_get_node_count() const {
@@ -544,6 +555,15 @@ void Performance::set_physics_process_time(double p_pt) {
 
 void Performance::set_navigation_process_time(double p_pt) {
 	_navigation_process_time = p_pt;
+}
+
+PackedInt64Array Performance::get_timing_stamps() const {
+	PackedInt64Array stamps;
+	stamps.resize(TIMING_MAX);
+	for (int i = 0; i < TIMING_MAX; i++) {
+		stamps.set(i, (int64_t)_timing_stamps[i]);
+	}
+	return stamps;
 }
 
 void Performance::add_custom_monitor(const StringName &p_id, const Callable &p_callable, const Vector<Variant> &p_args, MonitorType p_type) {

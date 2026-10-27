@@ -59,6 +59,26 @@ class Performance : public Object {
 	double _navigation_process_time;
 
 public:
+	// Main loop timestamps, OS::get_ticks_usec() (Time.get_ticks_usec()), set by
+	// Main::iteration as it goes. The tick stamps hold the current tick's phases
+	// up to where it has got; TIMING_TICK_END is the last finished tick's end, so
+	// it is earlier than TIMING_TICK_BEGIN while a tick runs.
+	enum TimingStamp {
+		TIMING_FRAME_BEGIN, // Main::iteration starts.
+		TIMING_XR_END, // XRServer's process done (xrWaitFrame included); the physics ticks start.
+		TIMING_TICK_BEGIN, // A physics tick starts (where TIME_PHYSICS_PROCESS starts).
+		TIMING_TICK_PREPARED, // MainLoop::iteration_prepare done (the interpolation's transform flush).
+		TIMING_TICK_SYNCED, // PhysicsServer3D::sync done.
+		TIMING_TICK_QUERIES_FLUSHED, // PhysicsServer3D::flush_queries done (state, contact and area callbacks).
+		TIMING_TICK_STEP_BEGIN, // The scene tree's tick and navigation done; PhysicsServer3D's step starts.
+		TIMING_TICK_END, // The step and MainLoop::iteration_end done.
+		TIMING_MAX,
+	};
+
+private:
+	uint64_t _timing_stamps[TIMING_MAX] = {};
+
+public:
 	enum Monitor {
 		TIME_FPS,
 		TIME_PROCESS,
@@ -141,6 +161,9 @@ public:
 	void set_physics_process_time(double p_pt);
 	void set_navigation_process_time(double p_pt);
 
+	_FORCE_INLINE_ void set_timing_stamp(TimingStamp p_stamp, uint64_t p_usec) { _timing_stamps[p_stamp] = p_usec; }
+	PackedInt64Array get_timing_stamps() const;
+
 	void add_custom_monitor(const StringName &p_id, const Callable &p_callable, const Vector<Variant> &p_args, MonitorType p_type = MONITOR_TYPE_QUANTITY);
 	void remove_custom_monitor(const StringName &p_id);
 	bool has_custom_monitor(const StringName &p_id);
@@ -173,3 +196,4 @@ private:
 
 VARIANT_ENUM_CAST(Performance::Monitor);
 VARIANT_ENUM_CAST(Performance::MonitorType);
+VARIANT_ENUM_CAST(Performance::TimingStamp);

@@ -113,6 +113,12 @@
 				Returns the last tick in which custom monitor was added/removed (in microseconds since the engine started). This is set to [method Time.get_ticks_usec] when the monitor is updated.
 			</description>
 		</method>
+		<method name="get_timing_stamps" qualifiers="const">
+			<return type="PackedInt64Array" />
+			<description>
+				Returns when the main loop reached each point of the current frame and physics tick, indexed by [enum TimingStamp], in microseconds on the [method Time.get_ticks_usec] clock. The tick stamps hold the current tick's phases as far as it has got; [constant TIMING_TICK_END] is the end of the last finished tick, so it is earlier than [constant TIMING_TICK_BEGIN] while a tick runs. Read it in [signal SceneTree.physics_frame] to see how long the current tick took before the scripts, and in [signal SceneTree.process_frame] to see the last tick's end.
+			</description>
+		</method>
 		<method name="has_custom_monitor">
 			<return type="bool" />
 			<param index="0" name="id" type="StringName" />
@@ -321,6 +327,33 @@
 		</constant>
 		<constant name="MONITOR_TYPE_PERCENTAGE" value="3" enum="MonitorType">
 			Monitor output is formatted as a percentage. Submitted values should represent a fractional value rather than the percentage directly, e.g. [code]0.5[/code] for [code]50.00%[/code].
+		</constant>
+		<constant name="TIMING_FRAME_BEGIN" value="0" enum="TimingStamp">
+			The frame's main loop iteration starts.
+		</constant>
+		<constant name="TIMING_XR_END" value="1" enum="TimingStamp">
+			The XR server's per-frame work is done, including the wait for the XR runtime's frame timing; the frame's physics ticks start.
+		</constant>
+		<constant name="TIMING_TICK_BEGIN" value="2" enum="TimingStamp">
+			A physics tick starts. [constant TIME_PHYSICS_PROCESS] measures from here.
+		</constant>
+		<constant name="TIMING_TICK_PREPARED" value="3" enum="TimingStamp">
+			The main loop's tick preparation is done (with physics interpolation, the transform flush).
+		</constant>
+		<constant name="TIMING_TICK_SYNCED" value="4" enum="TimingStamp">
+			The 3D physics server's sync is done.
+		</constant>
+		<constant name="TIMING_TICK_QUERIES_FLUSHED" value="5" enum="TimingStamp">
+			The 3D physics server's queries are flushed: body state, contact and area callbacks have run.
+		</constant>
+		<constant name="TIMING_TICK_STEP_BEGIN" value="6" enum="TimingStamp">
+			The scene tree's tick ([method Node._physics_process], deferred calls, timers) and navigation are done; the 3D physics step starts.
+		</constant>
+		<constant name="TIMING_TICK_END" value="7" enum="TimingStamp">
+			The physics step and the main loop's tick end are done. [constant TIME_PHYSICS_PROCESS] measures to here.
+		</constant>
+		<constant name="TIMING_MAX" value="8" enum="TimingStamp">
+			Represents the size of the [enum TimingStamp] enum.
 		</constant>
 	</constants>
 </class>
