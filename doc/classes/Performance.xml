@@ -113,6 +113,12 @@
 				Returns the last tick in which custom monitor was added/removed (in microseconds since the engine started). This is set to [method Time.get_ticks_usec] when the monitor is updated.
 			</description>
 		</method>
+		<method name="get_thread_schedstat" qualifiers="const">
+			<return type="PackedInt64Array" />
+			<description>
+				Returns the calling thread's scheduler counters from [code]/proc/thread-self/schedstat[/code]: time on a CPU in nanoseconds, time ready to run but waiting for a CPU in nanoseconds, and the number of timeslices run. Read twice around a span of work, the differences say how long the thread ran, waited for a CPU, or slept (the rest). Read natively, so it works on Android, where [FileAccess] can't open [code]/proc[/code]. Returns an empty array on systems without these counters (Windows, macOS).
+			</description>
+		</method>
 		<method name="get_timing_stamps" qualifiers="const">
 			<return type="PackedInt64Array" />
 			<description>

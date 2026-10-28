@@ -163,6 +163,7 @@ public:
 
 	_FORCE_INLINE_ void set_timing_stamp(TimingStamp p_stamp, uint64_t p_usec) { _timing_stamps[p_stamp] = p_usec; }
 	PackedInt64Array get_timing_stamps() const;
+	PackedInt64Array get_thread_schedstat() const;
 
 	void add_custom_monitor(const StringName &p_id, const Callable &p_callable, const Vector<Variant> &p_args, MonitorType p_type = MONITOR_TYPE_QUANTITY);
 	void remove_custom_monitor(const StringName &p_id);

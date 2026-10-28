@@ -40,6 +40,11 @@
 #include "servers/audio/audio_server.h"
 #include "servers/rendering/rendering_server.h"
 
+#ifdef __linux__
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 #ifndef NAVIGATION_2D_DISABLED
 #include "servers/navigation_2d/navigation_server_2d.h"
 #endif // NAVIGATION_2D_DISABLED
@@ -68,6 +73,7 @@ void Performance::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_custom_monitor_names"), &Performance::get_custom_monitor_names);
 	ClassDB::bind_method(D_METHOD("get_custom_monitor_types"), &Performance::get_custom_monitor_types);
 	ClassDB::bind_method(D_METHOD("get_timing_stamps"), &Performance::get_timing_stamps);
+	ClassDB::bind_method(D_METHOD("get_thread_schedstat"), &Performance::get_thread_schedstat);
 
 	BIND_ENUM_CONSTANT(TIME_FPS);
 	BIND_ENUM_CONSTANT(TIME_PROCESS);
@@ -564,6 +570,57 @@ PackedInt64Array Performance::get_timing_stamps() const {
 		stamps.set(i, (int64_t)_timing_stamps[i]);
 	}
 	return stamps;
+}
+
+PackedInt64Array Performance::get_thread_schedstat() const {
+	PackedInt64Array counters;
+#ifdef __linux__
+	// Read natively: on Android, FileAccess opens absolute paths through the Java
+	// file layer, which refuses /proc. /proc/thread-self resolves to the thread
+	// that opens it, so each thread keeps its own descriptor (-1: not open yet,
+	// -2: no schedstat here).
+	static thread_local int fd = -1;
+	if (fd == -1) {
+		fd = open("/proc/thread-self/schedstat", O_RDONLY | O_CLOEXEC);
+		if (fd < 0) {
+			fd = -2;
+		}
+	}
+	if (fd < 0) {
+		return counters;
+	}
+	char buf[96];
+	ssize_t len = pread(fd, buf, sizeof(buf) - 1, 0);
+	if (len <= 0) {
+		return counters;
+	}
+	buf[len] = '\0';
+	// Three numbers: time on a CPU (ns), time runnable but waiting for one (ns), timeslices run.
+	int64_t values[3] = {};
+	int count = 0;
+	char *p = buf;
+	while (count < 3 && *p) {
+		while (*p == ' ') {
+			p++;
+		}
+		if (*p < '0' || *p > '9') {
+			break;
+		}
+		int64_t v = 0;
+		while (*p >= '0' && *p <= '9') {
+			v = v * 10 + (*p - '0');
+			p++;
+		}
+		values[count++] = v;
+	}
+	if (count == 3) {
+		counters.resize(3);
+		for (int i = 0; i < 3; i++) {
+			counters.set(i, values[i]);
+		}
+	}
+#endif
+	return counters;
 }
 
 void Performance::add_custom_monitor(const StringName &p_id, const Callable &p_callable, const Vector<Variant> &p_args, MonitorType p_type) {
