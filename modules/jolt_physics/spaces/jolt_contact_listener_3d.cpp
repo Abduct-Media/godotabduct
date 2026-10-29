@@ -488,7 +488,14 @@ bool JoltContactListener3D::_try_add_contacts(const JPH::Body &p_jolt_body1, con
 
 	Manifold &manifold = [&]() -> Manifold & {
 		const MutexLock write_lock(write_mutex);
-		return manifolds_by_shape_pair[shape_pair];
+		Manifold *existing = manifolds_by_shape_pair.getptr(shape_pair);
+		if (existing != nullptr) {
+			return *existing;
+		}
+		if (JoltProjectSettings::ordered_contact_reports) {
+			new_shape_pairs.push_back(shape_pair);
+		}
+		return manifolds_by_shape_pair.insert(shape_pair, Manifold())->value;
 	}();
 
 	if (unlikely(!manifold.contacts1.is_empty())) {
@@ -750,6 +757,26 @@ void JoltContactListener3D::_evaluate_area_overlap(const JoltArea3D &p_area, con
 }
 
 void JoltContactListener3D::_flush_contacts() {
+	// DwarvenIndustry: ordered contact reports. The map keeps the pairs in the
+	// order they were added, which is the order bodies get their contacts, and a
+	// body reporting as many as it may keeps the first ones. Pairs that started
+	// touching in this step were added in whatever order Jolt's worker threads
+	// found them, so with the setting on they're moved to the end in key order:
+	// the same contacts on every run.
+	if (new_shape_pairs.size() > 1) {
+		new_shape_pairs.sort();
+		for (const JPH::SubShapeIDPair &shape_pair : new_shape_pairs) {
+			Manifold *manifold = manifolds_by_shape_pair.getptr(shape_pair);
+			if (manifold == nullptr) {
+				continue;
+			}
+			Manifold moved = *manifold;
+			manifolds_by_shape_pair.erase(shape_pair);
+			manifolds_by_shape_pair.insert(shape_pair, moved);
+		}
+	}
+	new_shape_pairs.clear();
+
 	for (KeyValue<JPH::SubShapeIDPair, Manifold> &E : manifolds_by_shape_pair) {
 		const JPH::SubShapeIDPair &shape_pair = E.key;
 		Manifold &manifold = E.value;

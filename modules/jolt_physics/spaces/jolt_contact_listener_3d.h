@@ -88,6 +88,9 @@ class JoltContactListener3D final
 	HashSet<JPH::SubShapeIDPair, ShapePairHasher> area_enters;
 	HashSet<JPH::SubShapeIDPair, ShapePairHasher> area_exits;
 	LocalVector<JPH::SubShapeIDPair> area_soft_body_overlaps;
+	// DwarvenIndustry: ordered contact reports. The shape pairs that started
+	// touching this step, put in key order at the flush (_flush_contacts).
+	LocalVector<JPH::SubShapeIDPair> new_shape_pairs;
 	Mutex write_mutex;
 	JoltSpace3D *space = nullptr;
 

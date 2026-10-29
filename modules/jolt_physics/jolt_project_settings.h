@@ -46,6 +46,7 @@ public:
 	inline static float penetration_slop;
 	inline static float max_contact_mass_ratio;
 	inline static float max_resting_mass_ratio;
+	inline static bool ordered_contact_reports;
 	inline static float speculative_contact_distance;
 	inline static float baumgarte_stabilization_factor;
 	inline static float soft_body_point_radius;
